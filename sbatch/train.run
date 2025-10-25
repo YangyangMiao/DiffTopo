@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --gres gpu:1
+#SBATCH --mem 120G
+#SBATCH --time 72:00:00
+#SBATCH --account lpdi
+#SBATCH --no-requeue
+
+module load gcc/8.4.0-cuda cuda/10.2.89
+conda activate torch
+cd /work/lpdi/users/ymiao/DiffSketch/DiffSketch_1108
+python -W ignore train.py

@@ -1,0 +1,35 @@
+exp_name: 'setup_sketchdiff'
+data: ../DiffSketch/CATH_slide_12time.pt
+checkpoints: ./ckpt
+logs: ./logs
+device: cuda
+#cuda
+log_iterations: null
+wandb_entity: yangyangmiao
+enable_progress_bar: True
+enable_wandb: True
+
+pad_data: False
+
+model: egnn_dynamics
+lr: 7.0e-4
+batch_size: 36
+n_layers: 6
+n_epochs: 15000
+test_epochs: 20
+n_stability_samples: 1
+nf: 128
+activation: silu
+attention: True
+condition_time: True
+tanh: False
+norm_constant: 1
+inv_sublayers: 1
+diffusion_loss_type: l2
+data_augmentation: True
+normalize_factors: [10, 4]
+
+sin_embedding: True
+normalization_factor: 1
+aggregation_method: 'sum'
+normalization: batch_norm

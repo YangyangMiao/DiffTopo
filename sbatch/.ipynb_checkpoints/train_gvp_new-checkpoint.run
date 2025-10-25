@@ -1,0 +1,13 @@
+#!/bin/bash -l
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --cpus-per-task 30
+#SBATCH --partition=gpu
+#SBATCH --qos=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --mem 120gb
+#SBATCH --time 72:00:00
+conda activate /work/lpdi/users/ymiao/Topoflowenv
+cd /work/lpdi/users/ymiao/DiffSketch/DiffSketch_bak
+python -W ignore train_gvp.py
+sbatch ./sbatch/train_gvp_new.run
