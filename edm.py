@@ -218,65 +218,65 @@ class EDM(torch.nn.Module):
         # return delta_log_px, kl_prior, loss_term_t, loss_term_0, l2_loss, noise_t, noise_0
 
     @torch.no_grad()
-    def sample_chain(self, x, h, node_mask, edge_mask,  keep_frames=None):
-        has_batch_dim = len(x.size()) > 2
-        sample_dim = (x.size(0), x.size(1)) if has_batch_dim else (x.size(0),)
-        n_samples = x.size(0) if has_batch_dim \
-            else len(torch.unique(node_mask))
+    # def sample_chain(self, x, h, node_mask, edge_mask,  keep_frames=None):
+    #     has_batch_dim = len(x.size()) > 2
+    #     sample_dim = (x.size(0), x.size(1)) if has_batch_dim else (x.size(0),)
+    #     n_samples = x.size(0) if has_batch_dim \
+    #         else len(torch.unique(node_mask))
         
-        pos = torch.arange(h.shape[1]).repeat(h.shape[0]).reshape(-1).to(h.device)
-        pos = pos/h.shape[1]
-        # pos = torch.arange(total_pos_num).to(h.device)
-        pos_emb = self.pos_embedding(pos)
-        pos_emb = pos_emb.reshape(h.shape[0],h.shape[1],-1)
-        pos = pos.reshape(h.shape[0],h.shape[1],-1)
+    #     pos = torch.arange(h.shape[1]).repeat(h.shape[0]).reshape(-1).to(h.device)
+    #     pos = pos/h.shape[1]
+    #     # pos = torch.arange(total_pos_num).to(h.device)
+    #     pos_emb = self.pos_embedding(pos)
+    #     pos_emb = pos_emb.reshape(h.shape[0],h.shape[1],-1)
+    #     pos = pos.reshape(h.shape[0],h.shape[1],-1)
         
-        # Normalization and concatenation
-        un_norm_h = h
-        x, h, = self.normalize(x, h)
-        h = torch.cat([h,pos_emb],dim=2)
-        #xh = torch.cat([x, h], dim=-1)
-        xh = torch.cat([x, h], dim=-1)
-        # Initial motif sampling from N(0, I)
-        z = torch.randn(sample_dim)#self.sample_combined_position_feature_noise(sample_dim, node_mask)
-        z = z * node_mask
-        if keep_frames is None:
-            keep_frames = self.T
-        else:
-            assert keep_frames <= self.T
-        chain = torch.zeros((keep_frames,) + (xh.size()[0],)+(xh.size()[1],)+(xh.size()[2]+self.in_node_nf,), device=z.device)
+    #     # Normalization and concatenation
+    #     un_norm_h = h
+    #     x, h, = self.normalize(x, h)
+    #     h = torch.cat([h,pos_emb],dim=2)
+    #     #xh = torch.cat([x, h], dim=-1)
+    #     xh = torch.cat([x, h], dim=-1)
+    #     # Initial motif sampling from N(0, I)
+    #     z = torch.randn(sample_dim)#self.sample_combined_position_feature_noise(sample_dim, node_mask)
+    #     z = z * node_mask
+    #     if keep_frames is None:
+    #         keep_frames = self.T
+    #     else:
+    #         assert keep_frames <= self.T
+    #     chain = torch.zeros((keep_frames,) + (xh.size()[0],)+(xh.size()[1],)+(xh.size()[2]+self.in_node_nf,), device=z.device)
 
-        # Sample p(z_s | z_t)
-        for s in reversed(range(0, self.T)):
-            s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
-            t_array = s_array + 1
-            s_array = s_array / self.T
-            t_array = t_array / self.T
+    #     # Sample p(z_s | z_t)
+    #     for s in reversed(range(0, self.T)):
+    #         s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
+    #         t_array = s_array + 1
+    #         s_array = s_array / self.T
+    #         t_array = t_array / self.T
 
-            z = self.sample_p_zs_given_zt(
-                s=s_array,
-                t=t_array,
-                z_t=z,
-                node_mask=node_mask,
-                edge_mask=edge_mask,
-                context= h,
-            )
-            write_index = (s * keep_frames) // self.T
-            # set_trace()
-            chain[write_index] = torch.cat([self.unnormalize_z(z),un_norm_h,pos_emb],dim=-1)
+    #         z = self.sample_p_zs_given_zt(
+    #             s=s_array,
+    #             t=t_array,
+    #             z_t=z,
+    #             node_mask=node_mask,
+    #             edge_mask=edge_mask,
+    #             context= h,
+    #         )
+    #         write_index = (s * keep_frames) // self.T
+    #         # set_trace()
+    #         chain[write_index] = torch.cat([self.unnormalize_z(z),un_norm_h,pos_emb],dim=-1)
 
-        # Finally sample p(x, h | z_0)
+    #     # Finally sample p(x, h | z_0)
         
-        x = self.sample_p_xh_given_z0(   #, h
-            z_0=z,
-            node_mask=node_mask,
-            edge_mask=edge_mask,
-            context= h,
-        )
-        # set_trace()
-        # chain[0] = torch.cat([x, un_norm_h], dim=-1)
-        chain0=torch.cat([x, un_norm_h], dim=-1)
-        return chain,chain0
+    #     x = self.sample_p_xh_given_z0(   #, h
+    #         z_0=z,
+    #         node_mask=node_mask,
+    #         edge_mask=edge_mask,
+    #         context= h,
+    #     )
+    #     # set_trace()
+    #     # chain[0] = torch.cat([x, un_norm_h], dim=-1)
+    #     chain0=torch.cat([x, un_norm_h], dim=-1)
+    #     return chain,chain0
     @torch.no_grad()
     def sample_chain_gvp(self, x, h, batch_mask, keep_frames=None):
         # Calculate position embeddings correctly for each batch
@@ -336,76 +336,76 @@ class EDM(torch.nn.Module):
         chain0 = torch.cat([x, un_norm_h], dim=-1)
         return chain, chain0
     @torch.no_grad()
-    def sample_chain_with_condition(self, x, h, node_mask, edge_mask,condition_mask,  keep_frames=None):
-        has_batch_dim = len(x.size()) > 2
-        sample_dim = (x.size(0), x.size(1)) if has_batch_dim else (x.size(0),)
-        n_samples = x.size(0) if has_batch_dim \
-            else len(torch.unique(node_mask))
+    # def sample_chain_with_condition(self, x, h, node_mask, edge_mask,condition_mask,  keep_frames=None):
+    #     has_batch_dim = len(x.size()) > 2
+    #     sample_dim = (x.size(0), x.size(1)) if has_batch_dim else (x.size(0),)
+    #     n_samples = x.size(0) if has_batch_dim \
+    #         else len(torch.unique(node_mask))
         
-        pos = torch.arange(h.shape[1]).repeat(h.shape[0]).reshape(-1).to(h.device)
-        pos = pos/h.shape[1]
-        # pos = torch.arange(total_pos_num).to(h.device)
-        pos_emb = self.pos_embedding(pos)
-        pos_emb = pos_emb.reshape(h.shape[0],h.shape[1],-1)
-        pos = pos.reshape(h.shape[0],h.shape[1],-1)
+    #     pos = torch.arange(h.shape[1]).repeat(h.shape[0]).reshape(-1).to(h.device)
+    #     pos = pos/h.shape[1]
+    #     # pos = torch.arange(total_pos_num).to(h.device)
+    #     pos_emb = self.pos_embedding(pos)
+    #     pos_emb = pos_emb.reshape(h.shape[0],h.shape[1],-1)
+    #     pos = pos.reshape(h.shape[0],h.shape[1],-1)
         
-        # Normalization and concatenation
-        un_norm_h = h
-        un_norm_condition_x = x * condition_mask
-        x, h, = self.normalize(x, h)
-        h = torch.cat([h,pos_emb],dim=2)
-        #xh = torch.cat([x, h], dim=-1)
-        xh = torch.cat([x, h], dim=-1)
-        condition_x = x * condition_mask
-        # Initial motif sampling from N(0, I)
-        z = self.sample_combined_position_feature_noise(sample_dim, node_mask)
-        z = z * node_mask
-        # set_trace()
-        z_h= z[:,:,3:]
-        z_x = z[:,:,0:3]*(1-condition_mask)+condition_x
-        z = torch.cat([z_x, z_h], dim=-1)
-        if keep_frames is None:
-            keep_frames = self.T
-        else:
-            assert keep_frames <= self.T
-        chain = torch.zeros((keep_frames,) + (xh.size()[0],)+(xh.size()[1],)+(xh.size()[2]+self.in_node_nf,), device=z.device)
+    #     # Normalization and concatenation
+    #     un_norm_h = h
+    #     un_norm_condition_x = x * condition_mask
+    #     x, h, = self.normalize(x, h)
+    #     h = torch.cat([h,pos_emb],dim=2)
+    #     #xh = torch.cat([x, h], dim=-1)
+    #     xh = torch.cat([x, h], dim=-1)
+    #     condition_x = x * condition_mask
+    #     # Initial motif sampling from N(0, I)
+    #     z = self.sample_combined_position_feature_noise(sample_dim, node_mask)
+    #     z = z * node_mask
+    #     # set_trace()
+    #     z_h= z[:,:,3:]
+    #     z_x = z[:,:,0:3]*(1-condition_mask)+condition_x
+    #     z = torch.cat([z_x, z_h], dim=-1)
+    #     if keep_frames is None:
+    #         keep_frames = self.T
+    #     else:
+    #         assert keep_frames <= self.T
+    #     chain = torch.zeros((keep_frames,) + (xh.size()[0],)+(xh.size()[1],)+(xh.size()[2]+self.in_node_nf,), device=z.device)
 
-        # Sample p(z_s | z_t)
-        for s in reversed(range(0, self.T)):
-            s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
-            t_array = s_array + 1
-            s_array = s_array / self.T
-            t_array = t_array / self.T
+    #     # Sample p(z_s | z_t)
+    #     for s in reversed(range(0, self.T)):
+    #         s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
+    #         t_array = s_array + 1
+    #         s_array = s_array / self.T
+    #         t_array = t_array / self.T
 
-            z = self.sample_p_zs_given_zt(
-                s=s_array,
-                t=t_array,
-                z_t=z,
-                node_mask=node_mask,
-                edge_mask=edge_mask,
-                context= h,
-            )
-            z_h= z[:,:,3:]
-            z_x = z[:,:,0:3]*(1-condition_mask)+condition_x
-            z = torch.cat([z_x, z_h], dim=-1)
-            # z = z*(1-condition_mask)+condition_x
-            write_index = (s * keep_frames) // self.T
-            # set_trace()
-            chain[write_index] = torch.cat([self.unnormalize_z(z),un_norm_h,pos_emb],dim=-1)
+    #         z = self.sample_p_zs_given_zt(
+    #             s=s_array,
+    #             t=t_array,
+    #             z_t=z,
+    #             node_mask=node_mask,
+    #             edge_mask=edge_mask,
+    #             context= h,
+    #         )
+    #         z_h= z[:,:,3:]
+    #         z_x = z[:,:,0:3]*(1-condition_mask)+condition_x
+    #         z = torch.cat([z_x, z_h], dim=-1)
+    #         # z = z*(1-condition_mask)+condition_x
+    #         write_index = (s * keep_frames) // self.T
+    #         # set_trace()
+    #         chain[write_index] = torch.cat([self.unnormalize_z(z),un_norm_h,pos_emb],dim=-1)
 
-        # Finally sample p(x, h | z_0)
+    #     # Finally sample p(x, h | z_0)
         
-        x = self.sample_p_xh_given_z0(   #, h
-            z_0=z,
-            node_mask=node_mask,
-            edge_mask=edge_mask,
-            context= h,
-        )
-        x = x*(1-condition_mask)+un_norm_condition_x
-        # set_trace()
-        # chain[0] = torch.cat([x, un_norm_h], dim=-1)
-        chain0=torch.cat([x, un_norm_h], dim=-1)
-        return chain,chain0
+    #     x = self.sample_p_xh_given_z0(   #, h
+    #         z_0=z,
+    #         node_mask=node_mask,
+    #         edge_mask=edge_mask,
+    #         context= h,
+    #     )
+    #     x = x*(1-condition_mask)+un_norm_condition_x
+    #     # set_trace()
+    #     # chain[0] = torch.cat([x, un_norm_h], dim=-1)
+    #     chain0=torch.cat([x, un_norm_h], dim=-1)
+    #     return chain,chain0
     @torch.no_grad()
     def sample_chain_gvp_inpaint(self, x, h, batch_mask,gt_keep_mask=None,interface_mask=None,keep_frames=None):
         #get idea from RePaint https://github.com/andreas128/RePaint/blob/main/guided_diffusion/gaussian_diffusion.py

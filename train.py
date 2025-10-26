@@ -1,3 +1,4 @@
+
 import lightning
 import data
 import yaml
@@ -10,9 +11,10 @@ from datetime import datetime
 from pytorch_lightning import Trainer, callbacks, loggers
 
 
-p = argparse.ArgumentParser(description='E3Diffusion')
-p.add_argument('--config', type=argparse.FileType(mode='r'), default='./testold.yml')
+p = argparse.ArgumentParser(description='E3 coarse grained Topology Diffusion')
+p.add_argument('--config', type=argparse.FileType(mode='r'), default='./config.yml')
 p.add_argument('--data', action='store', type=str,  default="datasets")
+p.add_argument('--complexdata', action='store', type=str,  default="datasets")
 p.add_argument('--checkpoints', action='store', type=str, default='checkpoints')
 p.add_argument('--logs', action='store', type=str, default='logs')
 p.add_argument('--device', action='store', type=str, default='cpu')
@@ -20,7 +22,7 @@ p.add_argument('--trainer_params', type=dict, help='parameters with keywords of 
 p.add_argument('--log_iterations', action='store', type=str, default=20)
 
 p.add_argument('--exp_name', type=str, default='YourName')
-p.add_argument('--model', type=str, default='egnn_dynamics',help='our_dynamics | schnet | simple_dynamics | kernel_dynamics | egnn_dynamics |gnn_dynamics')
+p.add_argument('--model', type=str, default='egnn_dynamics')
 p.add_argument('--probabilistic_model', type=str, default='diffusion', help='diffusion')
 
 # Training complexity is O(1) (unaffected), but sampling complexity is O(steps).
@@ -48,17 +50,12 @@ p.add_argument('--attention', type=eval, default=True, help='use attention in th
 p.add_argument('--norm_constant', type=float, default=1,help='diff/(|diff| + norm_constant)')
 p.add_argument('--sin_embedding', type=eval, default=False, help='whether using or not the sin embedding')
 p.add_argument('--ode_regularization', type=float, default=1e-3)
-p.add_argument('--dataset', type=str, default='qm9',  help='qm9 | qm9_second_half (train only on the last 50K samples of the training dataset)')
-p.add_argument('--datadir', type=str, default='qm9/temp',  help='qm9 directory')
-p.add_argument('--filter_n_atoms', type=int, default=None, help='When set to an integer value, QM9 will only contain molecules of that amount of atoms')
-p.add_argument('--dequantization', type=str, default='argmax_variational',  help='uniform | variational | argmax_variational | deterministic')
 p.add_argument('--n_report_steps', type=int, default=1)
 p.add_argument('--wandb_usr', type=str)
 p.add_argument('--no_wandb', action='store_true', help='Disable wandb')
 p.add_argument('--online', type=bool, default=False, help='True = wandb online -- False = wandb offline')
 p.add_argument('--no-cuda', action='store_true', default=True,  help='enables CUDA training')
 p.add_argument('--save_model', type=eval, default=True, help='save model')
-p.add_argument('--generate_epochs', type=int, default=1,help='save model')
 p.add_argument('--num_workers', type=int, default=0, help='Number of worker for the dataloader')
 p.add_argument('--test_epochs', type=int, default=1)
 p.add_argument('--data_augmentation', type=eval, default=False, help='use attention in the EGNN')
@@ -80,7 +77,7 @@ p.add_argument('--center_of_mass', type=str, default='interface', help='Where to
 p.add_argument('--pad_data', action='store_true', default=False, help='Use dense batches')
 
 args = p.parse_args(args=[])
-# args = p.parse_args(args=['--device', '0',  '--no_cuda'])
+# 
 if args.config:
     config_dict = yaml.load(args.config, Loader=yaml.FullLoader)
     arg_dict = args.__dict__
@@ -96,12 +93,19 @@ else:
 print(args)
 
 samples_dir = os.path.join(args.logs, 'samples')
-
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device(args.device  if torch.cuda.is_available() and not args.no_cuda else "cpu")
+if args.complexdata is not None:
+    pinderpath = [os.path.join(args.complexdata,'pinder_cluster_train_120_12.pt'),os.path.join(args.complexdata,'pinder_cluster_val.pt')]
+    train_pinder=True
+else:
+    pinderpath=None
+    train_pinder=False  
 ddpm= lightning.DDPM(
         data_path=args.data,
         in_node_nf=2,
         n_dims=3,
-        context_node_nf=10,#2
+        context_node_nf=11,#2
         hidden_nf=args.nf,
         activation=args.activation,
         n_layers=args.n_layers,
@@ -119,8 +123,8 @@ ddpm= lightning.DDPM(
         normalize_factors=args.normalize_factors,
         lr=args.lr,
         batch_size=args.batch_size,
-        torch_device=args.device,
-        model=args.model,
+        torch_device=device,
+        model='gvp_dynamics_new',
         test_epochs=args.test_epochs,
         n_stability_samples=args.n_stability_samples,
         normalization=args.normalization,
@@ -129,23 +133,25 @@ ddpm= lightning.DDPM(
         data_augmentation=args.data_augmentation,
         add_batch_dim=True,
         pos_embdim=8,
-        reflection_equiv=False
-    )
-
+        reflection_equiv=False,
+        num_workers=args.num_workers,
+        train_pinder=train_pinder,
+        pinder_path=pinderpath,
+    ).to(device)
 start_time = datetime.now().strftime('date%d-%m_time%H-%M-%S.%f')
 run_name = f'{os.path.splitext(os.path.basename(args.config))[0]}_{pwd.getpwuid(os.getuid())[0]}_{args.exp_name}_CATH_bs{args.batch_size}_{start_time}'
 checkpoint_callback = callbacks.ModelCheckpoint(
-    dirpath='./ckpt1121',
-    filename='diffsketch' + '_{epoch:02d}',
+    dirpath= args.checkpoints,
+    filename='difftopo' + '_{epoch:02d}',
     monitor='loss/val',
-    save_top_k=50,
-    every_n_epochs= 2,
+    save_top_k=10,
+    every_n_epochs= 1,
 
 )
 wandb_logger = loggers.WandbLogger(
             save_dir=args.logs,
-            project='DiffSketch+edge_sin_emb',
-            name='DiffSketch+edge_sin_emb',
+            project='Difftopo',
+            name='Difftopo',
             id=run_name,
             resume='must' if args.resume is not None else 'allow',
             entity=args.wandb_entity,
@@ -154,10 +160,24 @@ trainer = Trainer(
     max_epochs=args.n_epochs,
     logger=wandb_logger,
     callbacks=[checkpoint_callback],
-    accelerator=args.device,
+    accelerator="gpu",
     devices=1,
     num_sanity_val_steps=0,
     enable_progress_bar=args.enable_progress_bar,
 )
 print('Start training')
-trainer.fit(model=ddpm,ckpt_path='./ckpt1115/diffsketch_epoch=419.ckpt')
+import glob
+
+# Specify the directory where your files are stored
+directory_path = args.checkpoints
+
+# Use glob to find all files in the directory, and os.path.getmtime to get modification times
+list_of_files = glob.glob(f"{directory_path}/*")  # Use specific extension if needed, e.g., *.ckpt
+
+# Check if there are files in the directory
+if list_of_files:
+    latest_file = max(list_of_files, key=os.path.getmtime)
+    print(f"The latest file is: {latest_file}")
+else:
+    print("No files found in the directory.")
+trainer.fit(model=ddpm,ckpt_path=latest_file)#,ckpt_path=latest_file

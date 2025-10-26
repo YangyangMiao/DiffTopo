@@ -1,5 +1,5 @@
-exp_name: 'setup_sketchdiff'
-data: ../DiffSketch/CATH_slide_12time.pt
+exp_name: 'setup_difftopo'
+data: ./dataset/CATH.pt
 checkpoints: ./ckpt
 logs: ./logs
 device: cuda
